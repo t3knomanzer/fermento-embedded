@@ -209,6 +209,8 @@ __marimo__/
 # Project specific
 firmware/
 sandbox/
+_gui/
+gui/
 config.py
 wokwi.toml
 diagram.json
