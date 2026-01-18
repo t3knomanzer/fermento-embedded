@@ -3,7 +3,7 @@ from drivers.ssd1306.ssd1306 import SSD1306_I2C as SSD
 import gc
 from machine import Pin, I2C
 
-from gui.core.ugui import Display, Screen
+from lib.gui.core.ugui import Display, Screen
 
 import dht
 from lib.hcsr04 import HCSR04

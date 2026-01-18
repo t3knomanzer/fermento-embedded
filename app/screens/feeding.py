@@ -1,8 +1,8 @@
-from gui.core.ugui import Screen, ssd
-from gui.widgets.buttons import CloseButton
-from gui.widgets.label import Label
-from gui.core.writer import Writer
-import gui.fonts.arial10 as arial10
+from lib.gui.core.ugui import Screen, ssd
+from lib.gui.widgets.buttons import CloseButton
+from lib.gui.widgets.label import Label
+from lib.gui.core.writer import Writer
+import lib.gui.fonts.arial10 as arial10
 
 
 class FeedingScreen(Screen):

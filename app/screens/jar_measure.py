@@ -2,16 +2,16 @@ import asyncio
 import gc
 
 from hardware_setup import dist_sensor, temp_sensor
-import gui.fonts.freesans20 as large_font
-import gui.fonts.arial10 as small_font
-from gui.core.colors import BLACK, WHITE
-from gui.core.ugui import Screen, ssd
-from gui.widgets.buttons import Button
-from gui.widgets.label import Label
-from gui.core.writer import Writer
+import lib.gui.fonts.freesans20 as large_font
+import lib.gui.fonts.arial10 as small_font
+from lib.gui.core.colors import BLACK, WHITE
+from lib.gui.core.ugui import Screen, ssd
+from lib.gui.widgets.buttons import Button
+from lib.gui.widgets.label import Label
+from lib.gui.core.writer import Writer
 
 from app.utils.utils import print_mem
-from app.widgets.dialog import DialogBox
+from app.widgets.widgets.message_box import MessageBox
 from app.models.jar import JarModel
 from app.utils.decorators import timeit
 from app.services.db import DBService

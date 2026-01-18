@@ -2,13 +2,13 @@ import random
 
 from app.screens.jar_measure import MeasureScreen
 from app.utils.decorators import timeit
-from gui.core.ugui import Screen, ssd
-from gui.widgets.buttons import Button
-from gui.core.writer import Writer
-import gui.fonts.arial10 as small_font
+from lib.gui.core.ugui import Screen, ssd
+from lib.gui.widgets.buttons import Button
+from lib.gui.core.writer import Writer
+import lib.gui.fonts.arial10 as small_font
 
 from app.resources.names import NAMES
-from gui.widgets.label import Label
+from lib.gui.widgets.label import Label
 
 
 class JarNameScreen(Screen):

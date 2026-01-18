@@ -2,8 +2,8 @@ import gc
 from sys import exit
 
 import hardware_setup
-from gui.core.ugui import Screen
-from gui.core.ugui import ssd
+from lib.gui.core.ugui import Screen
+from lib.gui.core.ugui import ssd
 from app.screens.splash import SplashScreen
 from app.screens.main_menu import MainMenuScreen
 

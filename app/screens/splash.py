@@ -5,12 +5,12 @@ from sys import exit
 from app.screens.main_menu import MainMenuScreen
 from app.services.network import NetworkService
 from app.utils.utils import print_mem
-from gui.core.colors import BLACK, WHITE
-from gui.core.ugui import Screen, ssd
-from gui.widgets.bitmap import BitMap
-from gui.widgets.label import Label
-from gui.core.writer import Writer
-import gui.fonts.arial10 as arial10
+from lib.gui.core.colors import BLACK, WHITE
+from lib.gui.core.ugui import Screen, ssd
+from lib.gui.widgets.bitmap import BitMap
+from lib.gui.widgets.label import Label
+from lib.gui.core.writer import Writer
+import lib.gui.fonts.arial10 as arial10
 
 import config
 

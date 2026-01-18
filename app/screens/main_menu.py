@@ -1,11 +1,11 @@
 from app.screens.feeding import FeedingScreen
 from app.screens.jar_name import JarNameScreen
 from app.screens.tracking_select import TrackingSelectScreen
-from gui.core.ugui import Screen, ssd
+from lib.gui.core.ugui import Screen, ssd
 
-from gui.core.writer import Writer
-import gui.fonts.arial10 as arial10
-from gui.widgets.buttons import Button
+from lib.gui.core.writer import Writer
+import lib.gui.fonts.arial10 as arial10
+from lib.gui.widgets.buttons import Button
 
 
 class MainMenuScreen(Screen):
