@@ -2,7 +2,7 @@ import asyncio
 import gc
 
 from app.models.feeding_progress import FeedingProgressModel
-from hardware_setup import dist_sensor, temp_sensor
+from hardware_setup import distance_sensor, ambient_sensor
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -34,8 +34,8 @@ class TrackingGrowthScreen(Screen):
         self._elapsed_hours = 0
 
         self._db_service = DBService()
-        self._distance_sensor = dist_sensor
-        self._temperature_sensor = temp_sensor
+        self._distance_sensor = distance_sensor
+        self._temperature_sensor = ambient_sensor
 
         self._large_writer = Writer(ssd, large_font)
         self._small_writer = Writer(ssd, small_font)

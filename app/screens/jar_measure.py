@@ -1,7 +1,7 @@
 import asyncio
 import gc
 
-from hardware_setup import dist_sensor, temp_sensor
+from hardware_setup import distance_sensor, ambient_sensor
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -15,6 +15,7 @@ from app.widgets.widgets.message_box import MessageBox
 from app.models.jar import JarModel
 from app.utils.decorators import timeit
 from app.services.db import DBService
+from app.utils.filtering import TofDistanceFilter
 
 
 class MeasureScreen(Screen):
@@ -23,8 +24,9 @@ class MeasureScreen(Screen):
         self._jar_name = jar_name
         self._distance = 0
         self._db_service = DBService()
-        self._dist_sensor = dist_sensor
-        self._temp_sensor = temp_sensor
+        self._distance_sensor = distance_sensor
+        self._temperature_sensor = ambient_sensor
+        self._distance_filter = TofDistanceFilter()
 
         self._large_writer = Writer(ssd, large_font)
         self._small_writer = Writer(ssd, small_font)
@@ -93,15 +95,24 @@ class MeasureScreen(Screen):
 
     async def compute_temp(self):
         while type(Screen.current_screen) == MeasureScreen:
-            self._temp_sensor.measure()
-            temp = self._temp_sensor.temperature()
-            humidity = self._temp_sensor.humidity()
+            self._temperature_sensor.measure()
+            temp = self._temperature_sensor.temperature()
+            humidity = self._temperature_sensor.humidity()
             print(f"Temp: {temp} Humidity: {humidity}")
             await asyncio.sleep(3)
 
     async def compute_distance(self):
         while type(Screen.current_screen) == MeasureScreen:
-            distance = self._dist_sensor.distance_cm()
-            self._distance = int(distance * 10)
+            self._distance_sensor.start()
+            distance = 0
+            samples = 4
+            for i in range(samples):
+                distance += self._distance_sensor.read()
+
+            raw_avg_distance = distance // samples
+            raw_avg_distance = min(raw_avg_distance, 300)
+            filtered_distance = self._distance_filter.update(raw_avg_distance)
+
+            self._distance = filtered_distance
             self._distance_lbl.value(f"{self._distance} mm")
             await asyncio.sleep(0.1)
