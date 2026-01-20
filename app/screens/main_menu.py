@@ -4,7 +4,7 @@ from app.screens.jar_name import JarNameScreen
 from app.screens.settings import SettingsScreen
 from app.screens.tracking_select import TrackingSelectScreen
 from app.services.db import DBService
-from app.utils.decorators import timeit
+from app.utils.decorators import time_it
 from app.widgets.widgets.message_box import MessageBox
 from lib.gui.core.ugui import Screen, ssd
 

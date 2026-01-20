@@ -3,7 +3,7 @@ import random
 
 from app.screens.jar_measure import MeasureScreen
 from app.screens.tracking_growth import TrackingGrowthScreen
-from app.utils.decorators import timeit
+from app.utils.decorators import time_it
 from app.widgets.widgets.message_box import MessageBox
 from lib.gui.core.ugui import Screen, ssd
 from lib.gui.widgets.buttons import Button

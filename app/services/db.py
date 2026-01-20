@@ -1,9 +1,9 @@
 import gc
 from app.models.feeding import FeedingModel
 from app.models.jar import JarModel
-from app.utils.decorators import timeit
+from app.utils.decorators import time_it, track_mem
 import config
-from lib import urequests
+import urequests
 
 
 class DBService(object):
@@ -27,7 +27,8 @@ class DBService(object):
         result.update(item["fields"])
         return result
 
-    @timeit
+    @time_it
+    @track_mem
     def create_jar(self, model, retries=3):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_JARS)
@@ -35,16 +36,15 @@ class DBService(object):
 
         try:
             gc.collect()
-            print(f"Free mem: {gc.mem_free() / 1000}Kb")
             response = urequests.post(url, headers=headers, json=data)
-            response.close()
         except OSError as e:
             print(f"Error posting jar: {e}")
             if retries > 0:
                 print(f"Retries: {retries}")
                 self.create_jar(model, retries=retries - 1)
 
-    @timeit
+    @time_it
+    @track_mem
     def get_feedings(self, number=2, retries=3):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_FEEDINGS, query=f"pageSize={number}")
@@ -54,6 +54,7 @@ class DBService(object):
             print(f"Error getting feedings: {e}")
             if retries > 0:
                 print(f"Retries: {retries}")
+                gc.collect()
                 self.get_feedings(number, retries=retries - 1)
 
         data = response.json()
@@ -65,7 +66,8 @@ class DBService(object):
             models.append(model)
         return models
 
-    @timeit
+    @time_it
+    @track_mem
     def create_feeding_progress(self, model, retries=3):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_FEEDINGS_PROGRESS)
@@ -73,9 +75,7 @@ class DBService(object):
 
         try:
             gc.collect()
-            print(f"Free mem: {gc.mem_free() / 1000}Kb")
             response = urequests.post(url, headers=headers, json=data)
-            response.close()
         except OSError as e:
             print(f"Error posting progress: {e}")
             if retries > 0:

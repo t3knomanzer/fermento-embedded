@@ -1,7 +1,7 @@
 import random
 
 from app.screens.jar_measure import MeasureScreen
-from app.utils.decorators import timeit
+from app.utils.decorators import time_it
 from lib.gui.core.ugui import Screen, ssd
 from lib.gui.widgets.buttons import Button
 from lib.gui.core.writer import Writer
@@ -44,7 +44,7 @@ class JarNameScreen(Screen):
                 args=(name,),
             )
 
-    @timeit
+    @time_it
     def generate_name_choices(self, num_choices=3):
         btn_names = set()
         while len(btn_names) < num_choices:

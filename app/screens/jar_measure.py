@@ -10,10 +10,9 @@ from lib.gui.widgets.buttons import Button
 from lib.gui.widgets.label import Label
 from lib.gui.core.writer import Writer
 
-from app.utils.utils import print_mem
 from app.widgets.widgets.message_box import MessageBox
 from app.models.jar import JarModel
-from app.utils.decorators import timeit
+from app.utils.decorators import time_it, track_mem
 from app.services.db import DBService
 from app.utils.filtering import TofDistanceFilter
 
@@ -71,15 +70,15 @@ class MeasureScreen(Screen):
     def save(self, btn, arg):
         asyncio.create_task(self.save_async())
 
-    @timeit
+    @time_it
+    @track_mem
     async def save_async(self):
+        gc.collect()
         Screen.change(
             MessageBox, kwargs={"writer": self._small_writer, "message": "Saving..."}
         )
         await asyncio.sleep(0.01)
 
-        gc.collect()
-        print_mem()
         model = JarModel(self._jar_name, self._distance)
         self._db_service.create_jar(model)
         Screen.back()
@@ -95,15 +94,15 @@ class MeasureScreen(Screen):
         while type(Screen.current_screen) == MeasureScreen:
             self._distance_sensor.start()
             distance = 0
-            samples = 4
+            samples = 16
             for i in range(samples):
                 distance += self._distance_sensor.read()
 
             raw_avg_distance = distance // samples
-            raw_avg_distance = min(raw_avg_distance, 300)
-            filtered_distance = self._distance_filter.update(raw_avg_distance)
+            # raw_avg_distance = min(raw_avg_distance, 300)
+            # filtered_distance = self._distance_filter.update(raw_avg_distance)
 
-            self._distance = filtered_distance
+            self._distance = raw_avg_distance
             self._distance_lbl.value(f"{self._distance} mm")
             self._distance_sensor.stop()
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)

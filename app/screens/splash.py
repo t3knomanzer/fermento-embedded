@@ -3,7 +3,7 @@ import gc
 
 from app.screens.main_menu import MainMenuScreen
 from app.services.network import NetworkService
-from app.utils.utils import print_mem
+from app.utils.decorators import track_mem
 from lib.gui.core.colors import BLACK, WHITE
 from lib.gui.core.ugui import Screen, ssd
 from lib.gui.widgets.bitmap import BitMap
@@ -15,6 +15,7 @@ import config
 
 
 class SplashScreen(Screen):
+    @track_mem
     def __init__(self):
         writer = Writer(ssd, arial10)
 
@@ -29,7 +30,6 @@ class SplashScreen(Screen):
         bmp_size = (100, 60)
         col = ssd.width // 2 - bmp_size[0] // 2
         row = ssd.height // -+bmp_size[1] // 2
-        print_mem()
         self.graphic = BitMap(
             writer,
             row,
@@ -53,11 +53,10 @@ class SplashScreen(Screen):
     def after_open(self):
         asyncio.create_task(self.initialize())
 
+    @track_mem
     async def initialize(self):
         # Wifi
         gc.collect()
-        print_mem()
-
         await self.display_message_async("Connecting")
         if self._net_service.connect():
             await self.display_message_async("Welcome")

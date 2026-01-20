@@ -12,10 +12,9 @@ from lib.gui.widgets.buttons import Button
 from lib.gui.widgets.label import Label
 from lib.gui.core.writer import Writer
 
-from app.utils.utils import print_mem
 from app.widgets.widgets.message_box import MessageBox
 from app.models.jar import JarModel
-from app.utils.decorators import timeit
+from app.utils.decorators import time_it, track_mem
 from app.services.db import DBService
 
 
@@ -49,12 +48,14 @@ class TrackingGrowthScreen(Screen):
         )
         self._temperature_lbl.value("0C")
 
+        row = ssd.height - self._small_writer.height - 2
         col = ssd.width // 3
         self._distance_lbl = Label(
             self._small_writer, row=2, col=col, text=width, justify=Label.CENTRE
         )
         self._distance_lbl.value("0C")
 
+        row = 2
         col = ssd.width // 3 * 2
         self._humidity_lbl = Label(
             self._small_writer, row=2, col=col, text=width, justify=Label.RIGHT
@@ -88,6 +89,7 @@ class TrackingGrowthScreen(Screen):
         )
         self._starter_lbl.value(self._starter_name)
 
+        row = 2
         col = ssd.width // 3
         self._time_lbl = Label(
             self._small_writer, row=row, col=col, text=width, justify=Label.CENTRE
@@ -135,21 +137,21 @@ class TrackingGrowthScreen(Screen):
         while type(Screen.current_screen) == TrackingGrowthScreen:
             self._distance_sensor.start()
             distance = 0
-            samples = 4
+            samples = 16
             for i in range(samples):
                 distance += self._distance_sensor.read()
 
             raw_avg_distance = distance // samples
-            raw_avg_distance = min(raw_avg_distance, self._jar_distance)
-            filtered_distance = self._distance_filter.update(raw_avg_distance)
+            # raw_avg_distance = min(raw_avg_distance, self._jar_distance)
+            # filtered_distance = self._distance_filter.update(raw_avg_distance)
 
             if self._starting_distance is None:
-                self._starting_distance = filtered_distance
+                self._starting_distance = raw_avg_distance
 
-            self._current_distance = filtered_distance
+            self._current_distance = raw_avg_distance
             self._distance_lbl.value(f"{self._current_distance} mm")
             self._distance_sensor.stop()
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
 
     async def compute_growth(self):
         while type(Screen.current_screen) == TrackingGrowthScreen:
@@ -173,11 +175,11 @@ class TrackingGrowthScreen(Screen):
                 f"{self._elapsed_hours:02d}:{self._elapsed_minutes:02d}:{self._elapsed_seconds:02d}"
             )
 
-    @timeit
+    @time_it
+    @track_mem
     async def submit_data(self):
         while type(Screen.current_screen) == TrackingGrowthScreen:
             gc.collect()
-            print_mem()
             model = FeedingProgressModel(
                 self._feeding_id,
                 self._temperature,
