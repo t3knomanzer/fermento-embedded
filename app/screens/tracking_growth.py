@@ -140,7 +140,7 @@ class TrackingGrowthScreen(Screen):
                 distance += self._distance_sensor.read()
 
             raw_avg_distance = distance // samples
-            raw_avg_distance = min(raw_avg_distance, self._jar_distance + 5)
+            raw_avg_distance = min(raw_avg_distance, self._jar_distance)
             filtered_distance = self._distance_filter.update(raw_avg_distance)
 
             if self._starting_distance is None:
@@ -149,7 +149,7 @@ class TrackingGrowthScreen(Screen):
             self._current_distance = filtered_distance
             self._distance_lbl.value(f"{self._current_distance} mm")
             self._distance_sensor.stop()
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
 
     async def compute_growth(self):
         while type(Screen.current_screen) == TrackingGrowthScreen:
