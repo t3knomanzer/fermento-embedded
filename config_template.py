@@ -1,0 +1,12 @@
+WIFI_SSID = ""
+WIFI_PASSWORD = ""
+
+AIRTABLE_TOKEN = ""
+BASE_URL = "https://api.airtable.com/v0/"
+BASE_ID = ""
+TABLE_NAME = ""
+TABLE_FEEDINGS = ""
+TABLE_FEEDINGS_PROGRESS = ""
+TABLE_JARS = ""
+
+SPLASH_DELAY = 1
