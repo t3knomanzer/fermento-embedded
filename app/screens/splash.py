@@ -76,4 +76,4 @@ class SplashScreen(Screen):
     async def display_message_async(self, msg):
         self._lbl_msg.value(msg)
         # Give the UI a chance to refresh.
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
