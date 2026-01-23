@@ -53,7 +53,7 @@ while not tof_sensor and retries > 0:
         time.sleep(1)
 
 logger.info("Creating ambient sensor...")
-ambient_sensor = dht.DHT11(Pin(5, Pin.IN))
+ambient_sensor = dht.DHT22(Pin(5, Pin.IN))
 
 logger.info("Creating button pins...")
 btn_nxt = Pin(18, Pin.IN, Pin.PULL_UP)
