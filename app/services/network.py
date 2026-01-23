@@ -1,7 +1,6 @@
 from app.services.log import LogServiceManager
-from app.services.wifi_manager import WifiManager
+from app.services.web.wifi_manager import WifiManager
 
-from app.utils import memory
 import config
 
 # Create logger
