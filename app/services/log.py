@@ -1,6 +1,5 @@
 import os
 import logging
-from pathlib import Path
 
 DEBUG = logging.DEBUG
 INFO = logging.INFO
@@ -28,8 +27,9 @@ class LogServiceManager:
     @classmethod
     def set_filepath(cls, filepath: str) -> None:
         # Remove the log file if it exists
-        cls._filepath = Path(filepath)
-        cls._filepath.unlink(missing_ok=True)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        cls._filepath = filepath
 
         # Create the log output folder
         cls._filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -52,7 +52,7 @@ class LogService:
         self._logger = logging.getLogger(name)
         self._logger.setLevel(level)
 
-        file_handler = logging.FileHandler(str(filepath))
+        file_handler = logging.FileHandler(filepath)
         file_handler.setFormatter(formatter)
         self._logger.addHandler(file_handler)
 

@@ -1,12 +1,10 @@
-from pathlib import Path
+import config
 from app.services import log
 
 # Setup logging
-log_path = Path(".").parent.resolve()
-log_filepath = Path(log_path) / "app.log"
 log.LogServiceManager.set_name("Fermento")
 log.LogServiceManager.set_level(log.DEBUG)
-log.LogServiceManager.set_filepath(log_filepath)
+log.LogServiceManager.set_filepath(config.LOG_FILEPATH)
 
 import hardware_setup
 from app.screens.splash import SplashScreen
