@@ -198,7 +198,11 @@ class TrackingGrowthScreen(Screen):
     def compute_growth(self):
         initial_size = self._jar_distance - self._starting_distance
         growth_size = self._starting_distance - self._current_distance
-        growth_percent = max(0, growth_size / initial_size) * 100.0
+        print(f"initial size {initial_size} growth size {growth_size}")
+        try:
+            growth_percent = growth_size / initial_size * 100.0
+        except ZeroDivisionError:
+            growth_percent = 0
 
         self._growth_lbl.value(f"{int(growth_percent)}%")
         logger.info(f"Growth: {growth_percent}")
