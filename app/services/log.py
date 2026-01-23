@@ -1,4 +1,5 @@
 from app.utils.pathing import file_exists
+from app.utils.time import now_str, ntp_is_set
 
 DEBUG = 0
 INFO = 10
@@ -74,7 +75,8 @@ class LogService:
         self._filename = filename
 
     def _build_message(self, message: str, level: int, name: str | None = None) -> str:
-        return f"[{LEVEL_NAMES[level]}][{name or self._name}] {message}"
+        time = f"[{now_str()}]" if ntp_is_set() else ""
+        return f"{time}[{LEVEL_NAMES[level]}][{name or self._name}] {message}"
 
     def _log_console(self, message: str, level: int, name: str | None = None):
         msg = self._build_message(message, level, name)

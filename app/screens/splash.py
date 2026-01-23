@@ -5,6 +5,7 @@ from app.screens.main_menu import MainMenuScreen
 from app.services.log import LogServiceManager
 from app.services.network import NetworkService
 from app.utils import memory
+from app.utils.time import init_time
 from lib.gui.core.colors import BLACK, WHITE
 from lib.gui.core.ugui import Screen, ssd
 from lib.gui.widgets.bitmap import BitMap
@@ -68,6 +69,7 @@ class SplashScreen(Screen):
             await self.display_message_async("Setting up")
             # Give WiFi enough time to settle before setting the time
             await asyncio.sleep(1)
+            init_time()
             await self.display_message_async("Welcome")
             await asyncio.sleep(self._delay)
             Screen.change(self._next_screen)
