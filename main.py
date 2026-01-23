@@ -2,7 +2,6 @@ import config
 from app.services import log
 
 # Setup logging
-log.LogServiceManager.set_name("Fermento")
 log.LogServiceManager.set_level(log.DEBUG)
 log.LogServiceManager.set_filepath(config.LOG_FILEPATH)
 
