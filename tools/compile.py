@@ -4,7 +4,7 @@ import sys
 
 # -------- CONFIG --------
 MPY_CROSS = "mpy-cross"  # or full path to mpy-cross(.exe)
-ROOT = Path(__file__).resolve().parent.parent / "gui"
+ROOT = Path(__file__).resolve().parent.parent
 OPT_LEVEL = "-O2"
 
 EXCLUDE_DIRS = {
@@ -12,6 +12,13 @@ EXCLUDE_DIRS = {
     ".venv",
     "__pycache__",
     ".firmware",
+    "lib",
+    "_lib",
+    "drivers",
+    "_drivers",
+    "sandbox",
+    "tools",
+    "firmware",
 }
 # ------------------------
 

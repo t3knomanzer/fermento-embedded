@@ -2,7 +2,17 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXCLUDE_DIRS = {".venv", "firmware", "sandbox", "tools", "_lib", "lib", ".git"}
+EXCLUDE_DIRS = {
+    ".venv",
+    ".git",
+    "firmware",
+    "sandbox",
+    "tools",
+    "_lib",
+    "lib",
+    "_drivers",
+    "drivers",
+}
 
 MPREMOTE_BASE = ["mpremote"]
 
@@ -37,7 +47,7 @@ def ensure_remote_dirs(rel_path: Path):
         run_cmd(MPREMOTE_BASE + ["fs", "mkdir", f":/{accum}"], allow_fail=True)
 
 
-for py_file in sorted(ROOT.rglob("*.*")):
+for py_file in sorted(ROOT.rglob("*.mpy")):
     if should_exclude(py_file):
         continue
 
