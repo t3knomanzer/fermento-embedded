@@ -32,8 +32,6 @@ class DBService(object):
         result.update(item["fields"])
         return result
 
-    @time_it
-    @track_mem
     def create_jar(self, model, retries=3):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_JARS)
@@ -44,12 +42,11 @@ class DBService(object):
             response = urequests.post(url, headers=headers, json=data)
         except OSError as e:
             logger.error(f"Error posting jar: {e}")
+            memory.print_mem()
             if retries > 0:
                 logger.info(f"Retries: {retries}")
                 self.create_jar(model, retries=retries - 1)
 
-    @time_it
-    @track_mem
     def get_feedings(self, number=2, retries=3):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_FEEDINGS, query=f"pageSize={number}")
@@ -58,6 +55,7 @@ class DBService(object):
             response = urequests.get(url, headers=headers)
         except Exception as e:
             logger.error(f"Error getting feedings: {e}")
+            memory.print_mem()
             if retries > 0:
                 logger.info(f"Retries: {retries}")
                 gc.collect()
@@ -72,8 +70,6 @@ class DBService(object):
             models.append(model)
         return models
 
-    @time_it
-    @track_mem
     def create_feeding_progress(self, model, retries=3):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_FEEDINGS_PROGRESS)
@@ -84,6 +80,7 @@ class DBService(object):
             response = urequests.post(url, headers=headers, json=data)
         except OSError as e:
             logger.error(f"Error posting progress: {e}")
+            memory.print_mem()
             if retries > 0:
                 logger.info(f"Retries: {retries}")
-            self.create_feeding_progress(model, retries=retries - 1)
+                self.create_feeding_progress(model, retries=retries - 1)
