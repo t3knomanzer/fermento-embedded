@@ -1,5 +1,3 @@
-import os
-
 from app.utils.pathing import file_exists
 from app.utils.time import now_str, ntp_is_set
 
