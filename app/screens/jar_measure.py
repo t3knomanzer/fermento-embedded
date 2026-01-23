@@ -104,11 +104,11 @@ class MeasureScreen(Screen):
     async def compute_distance(self):
         while type(Screen.current_screen) == MeasureScreen:
             distance = 0
-            samples = config.TOF_SAMPLES_MEASURE
+            samples = config.TOF_SAMPLES_PREVIEW
             for i in range(samples):
                 distance += self._distance_sensor.range
             raw_avg_distance = distance // samples
 
             self._distance = raw_avg_distance
             self._distance_lbl.value(f"{self._distance} mm")
-            await asyncio.sleep(config.MEASURE_DELAY)
+            await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
