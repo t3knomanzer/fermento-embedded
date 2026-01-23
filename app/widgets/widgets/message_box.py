@@ -45,4 +45,4 @@ class MessageBox(Window):
         self.back_callback(None)
 
     def back_callback(self, button):
-        Screen.back_callback()
+        Screen.back()

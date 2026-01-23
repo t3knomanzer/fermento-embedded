@@ -38,7 +38,7 @@ class SettingsScreen(Screen):
         )
 
     def back_callback(self, btn):
-        Screen.back_callback()
+        Screen.back()
 
     def reset_settings(self, btn):
         try:

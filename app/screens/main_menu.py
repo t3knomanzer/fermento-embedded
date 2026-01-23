@@ -83,7 +83,7 @@ class MainMenuScreen(Screen):
         feedings = self._db_service.get_feedings(config.MAX_FEEDINGS)
 
         # Close the popup
-        Screen.back_callback()
+        Screen.back()
         Screen.change(TrackingSelectScreen, args=(feedings,))
 
     def navigate(self, button, arg):

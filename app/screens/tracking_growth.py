@@ -138,7 +138,7 @@ class TrackingGrowthScreen(Screen):
 
         elif self._state == TrackingGrowthScreen.STATE_RUNNING:
             self._state = TrackingGrowthScreen.STATE_STOPPED
-            Screen.back_callback()
+            Screen.back()
 
     def after_open(self):
         # We start tracking the distance, temperature and humidity right away
