@@ -46,9 +46,12 @@ venv.bak/
 
 # Project specific
 firmware/
-# lib/
+lib/
 _lib/
+_drivers/
+drivers/
 config.py
 wokwi.toml
 diagram.json
 *.code-workspace
+*.log
