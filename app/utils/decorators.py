@@ -22,11 +22,11 @@ def time_it(func):
 def track_mem(func):
     def wrapper(*args, **kwargs):
         logger.debug(
-            f"Mem: {func.__name__} Before - Free: {gc.mem_free() / 1000}Kb -- Allocated: {gc.mem_alloc() / 1000}Kb"
+            f"{func.__name__} Mem Before - Free: {gc.mem_free() / 1000}Kb -- Allocated: {gc.mem_alloc() / 1000}Kb"
         )
         result = func(*args, **kwargs)
         logger.debug(
-            f"Mem: {func.__name__} After - Free: {gc.mem_free() / 1000}Kb -- Allocated: {gc.mem_alloc() / 1000}Kb"
+            f"{func.__name__} Mem After - Free: {gc.mem_free() / 1000}Kb -- Allocated: {gc.mem_alloc() / 1000}Kb"
         )
         return result
 
