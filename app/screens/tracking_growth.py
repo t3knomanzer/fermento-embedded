@@ -125,7 +125,7 @@ class TrackingGrowthScreen(Screen):
             # Changing the text property doesn't force an update
             self._btn.text = "Starting..."
             self._btn.show()
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
 
             # At this point we start
             asyncio.create_task(self.compute_growth())
@@ -134,7 +134,7 @@ class TrackingGrowthScreen(Screen):
 
             self._btn.text = "Stop"
             self._btn.show()
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
 
         elif self._state == TrackingGrowthScreen.STATE_RUNNING:
             self._state = TrackingGrowthScreen.STATE_STOPPED
