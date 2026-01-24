@@ -6,7 +6,7 @@ from app.services.log import LogServiceManager
 from app.utils import memory
 from app.utils.filtering import TofDistanceFilter
 import config
-from hardware_setup import tof_sensor, ambient_sensor
+from hardware_setup import tof_sensor, trh_sensor
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -14,7 +14,6 @@ from lib.gui.core.ugui import Screen, ssd
 from lib.gui.widgets.buttons import Button
 from lib.gui.widgets.label import Label
 from lib.gui.core.writer import Writer
-from app.utils.decorators import time_it, track_mem
 from app.services.db import DBService
 
 # Create logger
@@ -44,8 +43,8 @@ class TrackingGrowthScreen(Screen):
         self._elapsed_hours = 0
 
         self._db_service = DBService()
-        self._distance_sensor = tof_sensor
-        self._temperature_sensor = ambient_sensor
+        self._tof_sensor = tof_sensor
+        self._trh_sensor = trh_sensor
 
         self._large_writer = Writer(ssd, large_font, verbose=False)
         self._small_writer = Writer(ssd, small_font, verbose=False)
@@ -123,8 +122,14 @@ class TrackingGrowthScreen(Screen):
         asyncio.create_task(self.run())
 
     async def run(self):
+        logger.info("Tracking...")
         # Compute temperature only once at the beginning if we are not running.
         self.compute_temperature()
+
+        # Set TOF preview settings
+        logger.debug("Setting TOF settings to PREVIEW")
+        self._tof_samples = config.TOF_SAMPLES_PREVIEW
+        self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
 
         while type(Screen.current_screen) == TrackingGrowthScreen:
             if self._state == TrackingGrowthScreen.STATE_RUNNING:
@@ -133,10 +138,12 @@ class TrackingGrowthScreen(Screen):
                     self._timer_state = TrackingGrowthScreen.STATE_RUNNING
                     asyncio.create_task(self.update_time())
 
+                logger.info("Gathering sensor data...")
                 self.compute_temperature()
                 self.compute_distance()
                 self.compute_growth()
 
+                logger.info("Submitting data...")
                 gc.collect()
                 self.submit_data()
                 await asyncio.sleep(config.RUNNING_UPDATE_DELAY)
@@ -150,20 +157,26 @@ class TrackingGrowthScreen(Screen):
 
     async def start_stop_async(self):
         if self._state == TrackingGrowthScreen.STATE_STOPPED:
+            logger.debug("Changing state to RUNNING")
             # Changing the text property doesn't force an update
             self._btn.text = "Stop"
             self._btn.show()
             await asyncio.sleep(0.1)
             self._state = TrackingGrowthScreen.STATE_RUNNING
 
+            logger.debug("Setting TOF settings to RUNNING")
+            self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
+            self._tof_samples = config.TOF_SAMPLES_RUNNING
+
         elif self._state == TrackingGrowthScreen.STATE_RUNNING:
+            logger.debug("Changing state to STOPPED")
             self._state = TrackingGrowthScreen.STATE_STOPPED
             Screen.back()
 
     def compute_temperature(self):
-        self._temperature_sensor.measure()
-        self._temperature = self._temperature_sensor.temperature()
-        self._humidity = self._temperature_sensor.humidity()
+        self._trh_sensor.measure()
+        self._temperature = self._trh_sensor.temperature()
+        self._humidity = self._trh_sensor.humidity()
 
         self._temperature_lbl.value(f"{self._temperature:.1f}C")
         self._humidity_lbl.value(f"{self._humidity:.1f}%")
@@ -171,19 +184,16 @@ class TrackingGrowthScreen(Screen):
 
     def compute_distance(self):
         distance = 0
-        samples = 0
-
-        # Change the number of samples depending on the current state
-        # since sampling takes time.
-        if self._state == TrackingGrowthScreen.STATE_STOPPED:
-            samples = config.TOF_SAMPLES_PREVIEW
-        elif self._state == TrackingGrowthScreen.STATE_RUNNING:
-            samples = config.TOF_SAMPLES_RUNNING
 
         # Take the samples and compute the average.
-        for i in range(samples):
-            distance += self._distance_sensor.range
-        raw_avg_distance = distance // samples
+        for i in range(self._tof_samples):
+            distance += self._tof_sensor.range
+
+        # Just in case, in the case where distance = 0
+        try:
+            raw_avg_distance = distance // self._tof_samples
+        except ZeroDivisionError:
+            raw_avg_distance = 0
 
         # Once we are running, save the first sample as the starting distance.
         if self._state == TrackingGrowthScreen.STATE_RUNNING:
@@ -193,7 +203,6 @@ class TrackingGrowthScreen(Screen):
         # Update the label.
         self._current_distance = raw_avg_distance
         self._distance_lbl.value(f"{self._current_distance} mm")
-        logger.info(f"Distance: {self._current_distance}")
 
     def compute_growth(self):
         initial_size = self._jar_distance - self._starting_distance
@@ -227,4 +236,5 @@ class TrackingGrowthScreen(Screen):
         logger.info(
             f"Submitting data: feeding: {self._feeding_id} T: {self._temperature} RH: {self._humidity}% starting distance:{self._starting_distance} cur distance: {self._current_distance}"
         )
+        memory.print_mem()
         self._db_service.create_feeding_progress(model)

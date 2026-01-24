@@ -1,4 +1,3 @@
-import config
 from app.services import log
 
 # Setup logging

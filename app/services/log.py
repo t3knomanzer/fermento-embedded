@@ -86,7 +86,7 @@ class LogService:
         msg = self._build_message(message, level, name)
         try:
             with open(self._filename, "a+") as fh:
-                fh.write(msg)
+                fh.write(msg + "\n")
         except Exception as e:
             self._log_console(
                 f"Error writing log to file: {self._filename}, {e}", ERROR

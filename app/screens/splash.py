@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import sys
 
 from app.screens.main_menu import MainMenuScreen
 from app.services.log import LogServiceManager
@@ -64,18 +65,31 @@ class SplashScreen(Screen):
         # user to connect to and enter credentials.
         gc.collect()
         memory.print_mem()
+
+        connected = None
         await self.display_message_async("Connecting")
-        if self._net_service.connect():
+        try:
+            connected = self._net_service.connect()
+        except Exception as e:
+            logger.critical(f"Error connecting to WiFi. {e}")
+            sys.exit()
+
+        if connected:
+            logger.info("Setting up...")
             await self.display_message_async("Setting up")
-            # Give WiFi enough time to settle before setting the time
-            await asyncio.sleep(1)
+            await asyncio.sleep(1)  # Give WiFi some time to initialize
             init_time()
             await self.display_message_async("Welcome")
             await asyncio.sleep(self._delay)
             Screen.change(self._next_screen)
         else:
-            await self.display_message_async("Setup WiFi")
-            self._net_service.start_server()
+            await self.display_message_async("Configure WiFi")
+            logger.info("Starting web server...")
+            try:
+                self._net_service.start_server()
+            except Exception as e:
+                logger.critical(f"Error starting web server. {e}")
+                sys.exit()
 
     async def display_message_async(self, msg):
         self._lbl_msg.value(msg)

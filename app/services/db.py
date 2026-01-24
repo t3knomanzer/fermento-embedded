@@ -32,35 +32,21 @@ class DBService(object):
         result.update(item["fields"])
         return result
 
-    def create_jar(self, model, retries=3):
+    @time_it
+    def create_jar(self, model):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_JARS)
         data = {"fields": model.to_dict()}
 
-        try:
-            gc.collect()
-            response = urequests.post(url, headers=headers, json=data)
-        except OSError as e:
-            logger.error(f"Error posting jar: {e}")
-            memory.print_mem()
-            if retries > 0:
-                logger.info(f"Retries: {retries}")
-                self.create_jar(model, retries=retries - 1)
+        gc.collect()
+        urequests.post(url, headers=headers, json=data)
 
-    def get_feedings(self, number=2, retries=3):
+    @time_it
+    def get_feedings(self, number=2):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_FEEDINGS, query=f"pageSize={number}")
-        try:
-            gc.collect()
-            response = urequests.get(url, headers=headers)
-        except Exception as e:
-            logger.error(f"Error getting feedings: {e}")
-            memory.print_mem()
-            if retries > 0:
-                logger.info(f"Retries: {retries}")
-                gc.collect()
-                self.get_feedings(number, retries=retries - 1)
-
+        gc.collect()
+        response = urequests.get(url, headers=headers)
         data = response.json()
 
         models = []
@@ -70,6 +56,7 @@ class DBService(object):
             models.append(model)
         return models
 
+    @time_it
     def create_feeding_progress(self, model, retries=3):
         headers = self._get_headers()
         url = self._get_url(config.TABLE_FEEDINGS_PROGRESS)
@@ -80,7 +67,6 @@ class DBService(object):
             response = urequests.post(url, headers=headers, json=data)
         except OSError as e:
             logger.error(f"Error posting progress: {e}")
-            memory.print_mem()
             if retries > 0:
                 logger.info(f"Retries: {retries}")
                 self.create_feeding_progress(model, retries=retries - 1)

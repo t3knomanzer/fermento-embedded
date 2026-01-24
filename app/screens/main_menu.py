@@ -5,7 +5,6 @@ from app.screens.tracking_select import TrackingSelectScreen
 from app.services.db import DBService
 from app.services.log import LogServiceManager
 from app.utils import memory
-from app.utils.decorators import time_it, track_mem
 from app.widgets.widgets.message_box import MessageBox
 import config
 from lib.gui.core.ugui import Screen, ssd
@@ -72,19 +71,36 @@ class MainMenuScreen(Screen):
             args=(MainMenuScreen.NAV_SETTINGS,),
         )
 
-    async def navigate_tracking(self):
+    async def show_popup(self, message, duration=None):
         # Popup
         Screen.change(
             MessageBox,
-            kwargs={"writer": self._writer, "message": "Retrieving data..."},
+            kwargs={"writer": self._writer, "message": message},
         )
-        await asyncio.sleep(0.01)
-        # Retrieve feedings, this takes some time.
-        feedings = self._db_service.get_feedings(config.MAX_FEEDINGS)
+        if duration:
+            await asyncio.sleep(duration)
+            Screen.back()
+        else:
+            await asyncio.sleep(0.01)
 
-        # Close the popup
-        Screen.back()
-        Screen.change(TrackingSelectScreen, args=(feedings,))
+    async def navigate_tracking(self):
+        # Retrieve feedings, this takes some time.
+        logger.info("Retrieving feedings...")
+        await self.show_popup("Retrieving data...")
+
+        try:
+            memory.print_mem()
+            feedings = self._db_service.get_feedings(config.MAX_FEEDINGS)
+            if not len(feedings):
+                logger.warning("No feedings found.")
+                Screen.back()  # Close the popup
+                await self.show_popup("No feedings found.", duration=1)
+            else:
+                Screen.back()  # Close the popup
+                Screen.change(TrackingSelectScreen, args=(feedings,))
+        except Exception as e:
+            logger.error(f"Error retrieving feeds. {e}")
+            Screen.back()  # Close the popup
 
     def navigate(self, button, arg):
         if arg == MainMenuScreen.NAV_JAR_NAME:

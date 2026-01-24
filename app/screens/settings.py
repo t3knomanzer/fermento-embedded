@@ -1,10 +1,14 @@
 import os
 import machine
+from app.services.log import LogServiceManager
 from lib.gui.core.ugui import Screen, ssd
 
 from lib.gui.core.writer import Writer
 import lib.gui.fonts.arial10 as arial10
 from lib.gui.widgets.buttons import Button
+
+# Create logger
+logger = LogServiceManager.get_logger(name=__name__)
 
 
 class SettingsScreen(Screen):
@@ -41,8 +45,9 @@ class SettingsScreen(Screen):
         Screen.back()
 
     def reset_settings(self, btn):
+        logger.info("Reset settings...")
         try:
             os.remove("/wifi.dat")
             machine.reset()
         except OSError as e:
-            print("Delete failed:", e)
+            logger.error("Delete failed:", e)

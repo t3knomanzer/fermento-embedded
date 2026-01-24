@@ -27,7 +27,7 @@ class MeasureScreen(Screen):
         self._jar_name = jar_name
         self._distance = 0
         self._db_service = DBService()
-        self._distance_sensor = tof_sensor
+        self._tof_sensor = tof_sensor
 
         self._large_writer = Writer(ssd, large_font, verbose=False)
         self._small_writer = Writer(ssd, small_font, verbose=False)
@@ -76,38 +76,59 @@ class MeasureScreen(Screen):
         btn_save.col = screen_center_h - btn_width - btn_margin // 2
         btn_cancel.col = screen_center_h + btn_margin // 2
 
+    def after_open(self):
+        asyncio.create_task(self.compute_distance())
+
     def save_callback(self, btn, arg):
         asyncio.create_task(self.save_async())
-
-    @time_it
-    async def save_async(self):
-        # Popup, since saving can take a while.
-        Screen.change(
-            MessageBox, kwargs={"writer": self._small_writer, "message": "Saving..."}
-        )
-        await asyncio.sleep(0.01)
-
-        model = JarModel(self._jar_name, self._distance)
-        self._db_service.create_jar(model)
-
-        # Back from the popup and back to the main menu.
-        Screen.back()
-        Screen.back()
 
     def back_callback(self, button, arg):
         Screen.back()
 
-    def after_open(self):
-        asyncio.create_task(self.compute_distance())
+    def average_sample(self, samples):
+        distance = 0
+        for i in range(samples):
+            distance += self._tof_sensor.range
+        return distance // samples
 
     async def compute_distance(self):
+        logger.info("Previewing distance...")
+        print_mem()
+        tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
         while type(Screen.current_screen) == MeasureScreen:
-            distance = 0
-            samples = config.TOF_SAMPLES_PREVIEW
-            for i in range(samples):
-                distance += self._distance_sensor.range
-            raw_avg_distance = distance // samples
-
-            self._distance = raw_avg_distance
+            self._distance = self.average_sample(config.TOF_SAMPLES_PREVIEW)
             self._distance_lbl.value(f"{self._distance} mm")
             await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
+
+    async def save_async(self):
+        logger.info("Saving distance...")
+        print_mem()
+        # Popup, since saving can take a while.
+        await self.show_popup("Saving...")
+
+        # We take 1 high quality sample for saving.
+        tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
+        self._distance = self.average_sample(config.TOF_SAMPLES_RUNNING)
+
+        try:
+            model = JarModel(self._jar_name, self._distance)
+            self._db_service.create_jar(model)
+
+            Screen.back()  # Close the popup
+            Screen.back()  # Back to the main menu
+        except Exception as e:
+            logger.error(f"Error saving. {e}")
+            Screen.back()  # Close the popup
+            await self.show_popup("Error saving.", 1)
+
+    async def show_popup(self, message, duration=None):
+        # Popup
+        Screen.change(
+            MessageBox,
+            kwargs={"writer": self._small_writer, "message": message},
+        )
+        if duration:
+            await asyncio.sleep(duration)
+            Screen.back()
+        else:
+            await asyncio.sleep(0.01)

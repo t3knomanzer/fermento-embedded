@@ -3,7 +3,6 @@ import random
 from app.screens.jar_measure import MeasureScreen
 from app.services.log import LogServiceManager
 from app.utils import memory
-from app.utils.decorators import time_it
 import config
 from lib.gui.core.ugui import Screen, ssd
 from lib.gui.widgets.buttons import Button
@@ -55,6 +54,7 @@ class JarNameScreen(Screen):
             )
 
     def generate_name_choices(self, num_choices=3):
+        logger.info("Generating name choices...")
         btn_names = set()
         while len(btn_names) < num_choices:
             index = random.randint(0, len(NAMES) - 1)
@@ -64,4 +64,5 @@ class JarNameScreen(Screen):
         return btn_names
 
     def select_name(self, button, arg):
+        logger.info(f"Name selected: {arg}")
         Screen.change(MeasureScreen, mode=Screen.REPLACE, args=[arg])
