@@ -1,12 +1,13 @@
 import asyncio
 import gc
+import time
 
 from app.models.feeding_progress import FeedingProgressModel
 from app.services.log import LogServiceManager
 from app.utils import memory
 from app.utils.filtering import TofDistanceFilter
 import config
-from hardware_setup import tof_sensor, trh_sensor
+from hardware_setup import tof_sensor, trh_sensor, co2_sensor
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -45,6 +46,7 @@ class TrackingGrowthScreen(Screen):
         self._db_service = DBService()
         self._tof_sensor = tof_sensor
         self._trh_sensor = trh_sensor
+        self._co2_sensor = co2_sensor
 
         self._large_writer = Writer(ssd, large_font, verbose=False)
         self._small_writer = Writer(ssd, small_font, verbose=False)
@@ -121,16 +123,28 @@ class TrackingGrowthScreen(Screen):
     def after_open(self):
         asyncio.create_task(self.run())
 
+    def set_sensor_preview_settings(self):
+        self._tof_samples = config.TOF_SAMPLES_PREVIEW
+        self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
+        self._co2_sensor.stop_periodic_measurement()
+        self._co2_sensor.start_periodic_measurement()
+
+    def set_sensor_running_settings(self):
+        self._tof_samples = config.TOF_SAMPLES_RUNNING
+        self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
+        self._co2_sensor.stop_periodic_measurement()
+        self._co2_sensor.start_low_periodic_measurement()
+
     async def run(self):
         logger.info("Tracking...")
+        # Set sensor preview settings when we first start
+        logger.debug("Setting sensor settings to PREVIEW")
+        self.set_sensor_preview_settings()
+
         # Compute temperature only once at the beginning if we are not running.
         self.compute_temperature()
 
-        # Set TOF preview settings
-        logger.debug("Setting TOF settings to PREVIEW")
-        self._tof_samples = config.TOF_SAMPLES_PREVIEW
-        self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
-
+        # Main loop
         while type(Screen.current_screen) == TrackingGrowthScreen:
             if self._state == TrackingGrowthScreen.STATE_RUNNING:
                 # We start the timer async since it updates at a different interval.
@@ -149,6 +163,7 @@ class TrackingGrowthScreen(Screen):
                 await asyncio.sleep(config.RUNNING_UPDATE_DELAY)
 
             elif self._state == TrackingGrowthScreen.STATE_STOPPED:
+                self.compute_temperature()
                 self.compute_distance()
                 await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
 
@@ -164,13 +179,14 @@ class TrackingGrowthScreen(Screen):
             await asyncio.sleep(0.1)
             self._state = TrackingGrowthScreen.STATE_RUNNING
 
-            logger.debug("Setting TOF settings to RUNNING")
-            self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
-            self._tof_samples = config.TOF_SAMPLES_RUNNING
+            logger.debug("Setting sensor settings to RUNNING")
+            self.set_sensor_running_settings()
 
         elif self._state == TrackingGrowthScreen.STATE_RUNNING:
             logger.debug("Changing state to STOPPED")
             self._state = TrackingGrowthScreen.STATE_STOPPED
+            logger.debug("Stopping sensors")
+            self._co2_sensor.stop_periodic_measurement()
             Screen.back()
 
     def compute_temperature(self):
@@ -180,7 +196,18 @@ class TrackingGrowthScreen(Screen):
 
         self._temperature_lbl.value(f"{self._temperature:.1f}C")
         self._humidity_lbl.value(f"{self._humidity:.1f}%")
-        logger.info(f"T: {self._temperature} RH: {self._humidity}")
+        logger.info(f"DHT22 - T: {self._temperature} RH: {self._humidity}")
+
+        logger.info("Gathering SCD41 data...")
+        while True:
+            if self._co2_sensor.data_ready:
+                logger.info(
+                    f"SCD41 - T:{self._co2_sensor.temperature} RH: {self._co2_sensor.relative_humidity} CO2: {self._co2_sensor.CO2}ppm"
+                )
+                break
+            else:
+                logger.info("SDC41 Data not ready")
+                time.sleep(0.1)
 
     def compute_distance(self):
         distance = 0

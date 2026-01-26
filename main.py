@@ -1,7 +1,8 @@
+import config
 from app.services import log
 
 # Setup logging
-log.LogServiceManager.initialize(level=log.DEBUG)
+log.LogServiceManager.initialize(level=log.DEBUG, max_files=config.LOG_MAX_FILES)
 
 import hardware_setup
 from app.screens.splash import SplashScreen
