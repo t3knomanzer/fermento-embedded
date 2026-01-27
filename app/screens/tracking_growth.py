@@ -7,7 +7,8 @@ from app.services.log import LogServiceManager
 from app.utils import memory
 from app.utils.filtering import TofDistanceFilter
 import config
-from hardware_setup import tof_sensor, env_sensor
+from drivers import sht4x
+from hardware_setup import tof_sensor, sdc41, bme680, sht40
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -46,7 +47,9 @@ class TrackingGrowthScreen(Screen):
 
         self._db_service = DBService()
         self._tof_sensor = tof_sensor
-        self._env_sensor = env_sensor
+        self._scd41_sensor = sdc41
+        self._bme680_sensor = bme680
+        self._sht40 = sht40
 
         self._large_writer = Writer(ssd, large_font, verbose=False)
         self._small_writer = Writer(ssd, small_font, verbose=False)
@@ -126,20 +129,23 @@ class TrackingGrowthScreen(Screen):
     def set_sensor_preview_settings(self):
         self._tof_samples = config.TOF_SAMPLES_PREVIEW
         self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
-        self._env_sensor.stop_periodic_measurement()
-        self._env_sensor.start_periodic_measurement()
+        self._scd41_sensor.stop_periodic_measurement()
+        self._scd41_sensor.start_periodic_measurement()
 
     def set_sensor_running_settings(self):
         self._tof_samples = config.TOF_SAMPLES_RUNNING
         self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
-        self._env_sensor.stop_periodic_measurement()
-        self._env_sensor.start_low_periodic_measurement()
+        self._scd41_sensor.stop_periodic_measurement()
+        self._scd41_sensor.start_low_periodic_measurement()
 
     async def run(self):
         logger.info("Tracking...")
         # Set sensor preview settings when we first start
         logger.debug("Setting sensor settings to PREVIEW")
         self.set_sensor_preview_settings()
+        self._scd41_sensor.mode = sht4x.Mode.NOHEAT_HIGHPRECISION
+        # change this to match the location's pressure (hPa) at sea level
+        self._bme680_sensor.sea_level_pressure = 1013.25
 
         # Compute environment only once at the beginning if we are not running.
         self.compute_environment()
@@ -185,20 +191,32 @@ class TrackingGrowthScreen(Screen):
             logger.debug("Changing state to STOPPED")
             self._state = TrackingGrowthScreen.STATE_STOPPED
             logger.debug("Stopping sensors")
-            self._env_sensor.stop_periodic_measurement()
+            self._scd41_sensor.stop_periodic_measurement()
             Screen.back()
 
     def compute_environment(self):
         logger.info("Gathering SCD41 data...")
-        while not self._env_sensor.data_ready:
+        while not self._scd41_sensor.data_ready:
             time.sleep(0.1)
 
-        self._temperature = self._env_sensor.temperature
-        self._rh = self._env_sensor.relative_humidity
-        self._co2 = self._env_sensor.CO2
+        self._temperature = self._scd41_sensor.temperature
+        self._rh = self._scd41_sensor.relative_humidity
+        self._co2 = self._scd41_sensor.CO2
         logger.info(
             f"SCD41 - T:{self._temperature:.1f}C RH: {self._rh:.1f}% CO2: {self._co2}ppm"
         )
+
+        logger.info("Gathering BME680 data...")
+        logger.info(
+            f"BME680 - T:{self._bme680_sensor.temperature:.1f}C RH: {self._bme680_sensor.humidity:.1f}% Gas: {self._bme680_sensor.gas} Ohm"
+        )
+        logger.info(
+            f"BME680 - Altitude:{self._bme680_sensor.altitude:.1f} Pressure: {self._bme680_sensor.pressure:.1f} Si"
+        )
+
+        logger.info("Gathering SHT40 data...")
+        t, rh = self._sht40.measurements
+        logger.info(f"SHT40 - T:{t:.1f}C RH: {rh:.1f}%")
 
         self._temperature_lbl.value(f"{self._temperature:.1f}C")
         self._rh_lbl.value(f"{self._rh:.1f}%")

@@ -2,6 +2,8 @@ import gc
 import sys
 from machine import Pin, I2C
 import time
+import neopixel
+
 
 from app.services.log import LogServiceManager
 from app.utils import memory
@@ -26,8 +28,8 @@ from drivers.vl53l0x import VL53L0X
 logger.info("Importing SCD4X driver...")
 from drivers.scd4x import SCD4X
 
-logger.info("Importing BME680 driver...")
-from drivers.bme680 import Adafruit_BME680_I2C
+logger.info("Importing SHT40 driver...")
+from drivers.sht4x import SHT4x
 
 logger.info("Importing gui...")
 from lib.gui.core.ugui import Display, Screen
@@ -35,7 +37,6 @@ from lib.gui.core.ugui import Display, Screen
 memory.print_mem()
 
 logger.info("Creating I2C bus...")
-i2c_bus = I2C(0, sda=Pin(2), scl=Pin(4))
 i2c_bus = I2C(0, sda=Pin(45), scl=Pin(47))
 
 logger.info("Creating SSD...")
@@ -71,24 +72,15 @@ if tof_sensor is None:
     logger.critical("Couldn't create TOF sensor.")
     sys.exit()
 
-logger.info("Creating SDC41 sensor...")
-env_sensor = None
-retries = 3
-while not env_sensor and retries > 0:
-    try:
-        env_sensor = SCD4X(i2c_bus)
-    except Exception as e:
-        logger.error(f"({retries}) Error creating SDC41 sensor. {e}")
-        retries -= 1
-        time.sleep(1)
+logger.info("Creating SCD41 sensor...")
+sdc41 = SCD4X(i2c_bus)
 
-if env_sensor is None:
-    logger.critical("Couldn't create SDC41 sensor.")
-    sys.exit()
+
+logger.info("Creating SHT40 sensor...")
+sht40 = SHT4x(i2c_bus)
+
 
 logger.info("Creating button pins...")
-btn_nxt = Pin(18, Pin.IN, Pin.PULL_UP)
-btn_sel = Pin(19, Pin.IN, Pin.PULL_UP)
 btn_nxt = Pin(41, Pin.IN, Pin.PULL_UP)
 btn_sel = Pin(42, Pin.IN, Pin.PULL_UP)
 btn_prev = None
