@@ -7,7 +7,7 @@ from app.services.log import LogServiceManager
 from app.utils import memory
 from app.utils.filtering import TofDistanceFilter
 import config
-from hardware_setup import tof_sensor, trh_sensor, co2_sensor
+from hardware_setup import tof_sensor, env_sensor
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -36,7 +36,8 @@ class TrackingGrowthScreen(Screen):
         self._starting_distance = None
         self._current_distance = 0
         self._temperature = 0
-        self._humidity = 0
+        self._rh = 0
+        self._co2 = 0
         self._state = TrackingGrowthScreen.STATE_STOPPED
         self._timer_state = TrackingGrowthScreen.STATE_STOPPED
         self._elapsed_seconds = 0
@@ -45,8 +46,7 @@ class TrackingGrowthScreen(Screen):
 
         self._db_service = DBService()
         self._tof_sensor = tof_sensor
-        self._trh_sensor = trh_sensor
-        self._co2_sensor = co2_sensor
+        self._env_sensor = env_sensor
 
         self._large_writer = Writer(ssd, large_font, verbose=False)
         self._small_writer = Writer(ssd, small_font, verbose=False)
@@ -71,10 +71,10 @@ class TrackingGrowthScreen(Screen):
         # Top right (humidity)
         row = 2
         col = ssd.width // 3 * 2
-        self._humidity_lbl = Label(
+        self._rh_lbl = Label(
             self._small_writer, row=2, col=col, text=width, justify=Label.RIGHT
         )
-        self._humidity_lbl.value("0%")
+        self._rh_lbl.value("0%")
 
         # Center left (growth)
         width = ssd.width // 2
@@ -126,14 +126,14 @@ class TrackingGrowthScreen(Screen):
     def set_sensor_preview_settings(self):
         self._tof_samples = config.TOF_SAMPLES_PREVIEW
         self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
-        self._co2_sensor.stop_periodic_measurement()
-        self._co2_sensor.start_periodic_measurement()
+        self._env_sensor.stop_periodic_measurement()
+        self._env_sensor.start_periodic_measurement()
 
     def set_sensor_running_settings(self):
         self._tof_samples = config.TOF_SAMPLES_RUNNING
         self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
-        self._co2_sensor.stop_periodic_measurement()
-        self._co2_sensor.start_low_periodic_measurement()
+        self._env_sensor.stop_periodic_measurement()
+        self._env_sensor.start_low_periodic_measurement()
 
     async def run(self):
         logger.info("Tracking...")
@@ -141,8 +141,8 @@ class TrackingGrowthScreen(Screen):
         logger.debug("Setting sensor settings to PREVIEW")
         self.set_sensor_preview_settings()
 
-        # Compute temperature only once at the beginning if we are not running.
-        self.compute_temperature()
+        # Compute environment only once at the beginning if we are not running.
+        self.compute_environment()
 
         # Main loop
         while type(Screen.current_screen) == TrackingGrowthScreen:
@@ -153,7 +153,7 @@ class TrackingGrowthScreen(Screen):
                     asyncio.create_task(self.update_time())
 
                 logger.info("Gathering sensor data...")
-                self.compute_temperature()
+                self.compute_environment()
                 self.compute_distance()
                 self.compute_growth()
 
@@ -163,7 +163,6 @@ class TrackingGrowthScreen(Screen):
                 await asyncio.sleep(config.RUNNING_UPDATE_DELAY)
 
             elif self._state == TrackingGrowthScreen.STATE_STOPPED:
-                self.compute_temperature()
                 self.compute_distance()
                 await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
 
@@ -186,28 +185,23 @@ class TrackingGrowthScreen(Screen):
             logger.debug("Changing state to STOPPED")
             self._state = TrackingGrowthScreen.STATE_STOPPED
             logger.debug("Stopping sensors")
-            self._co2_sensor.stop_periodic_measurement()
+            self._env_sensor.stop_periodic_measurement()
             Screen.back()
 
-    def compute_temperature(self):
-        self._trh_sensor.measure()
-        self._temperature = self._trh_sensor.temperature()
-        self._humidity = self._trh_sensor.humidity()
+    def compute_environment(self):
+        logger.info("Gathering SCD41 data...")
+        while not self._env_sensor.data_ready:
+            time.sleep(0.1)
+
+        self._temperature = self._env_sensor.temperature
+        self._rh = self._env_sensor.relative_humidity
+        self._co2 = self._env_sensor.CO2
+        logger.info(
+            f"SCD41 - T:{self._temperature:.1f}C RH: {self._rh:.1f}% CO2: {self._co2}ppm"
+        )
 
         self._temperature_lbl.value(f"{self._temperature:.1f}C")
-        self._humidity_lbl.value(f"{self._humidity:.1f}%")
-        logger.info(f"DHT22 - T: {self._temperature} RH: {self._humidity}")
-
-        logger.info("Gathering SCD41 data...")
-        while True:
-            if self._co2_sensor.data_ready:
-                logger.info(
-                    f"SCD41 - T:{self._co2_sensor.temperature} RH: {self._co2_sensor.relative_humidity} CO2: {self._co2_sensor.CO2}ppm"
-                )
-                break
-            else:
-                logger.info("SDC41 Data not ready")
-                time.sleep(0.1)
+        self._rh_lbl.value(f"{self._rh:.1f}%")
 
     def compute_distance(self):
         distance = 0
@@ -256,12 +250,13 @@ class TrackingGrowthScreen(Screen):
         model = FeedingProgressModel(
             self._feeding_id,
             self._temperature,
-            self._humidity / 100,
+            self._rh / 100,
+            self._co2,
             self._starting_distance,
             self._current_distance,
         )
         logger.info(
-            f"Submitting data: feeding: {self._feeding_id} T: {self._temperature} RH: {self._humidity}% starting distance:{self._starting_distance} cur distance: {self._current_distance}"
+            f"Submitting data: feeding: {self._feeding_id} T: {self._temperature} RH: {self._rh}% CO2: {self._co2}ppm starting distance:{self._starting_distance} cur distance: {self._current_distance}"
         )
         memory.print_mem()
         self._db_service.create_feeding_progress(model)
