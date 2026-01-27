@@ -8,7 +8,7 @@ from app.utils import memory
 from app.utils.filtering import TofDistanceFilter
 import config
 from drivers import sht4x
-from hardware_setup import tof_sensor, sdc41, bme680, sht40
+from hardware_setup import tof_sensor, sdc41, sht40
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -48,7 +48,6 @@ class TrackingGrowthScreen(Screen):
         self._db_service = DBService()
         self._tof_sensor = tof_sensor
         self._scd41_sensor = sdc41
-        self._bme680_sensor = bme680
         self._sht40 = sht40
 
         self._large_writer = Writer(ssd, large_font, verbose=False)
@@ -126,26 +125,33 @@ class TrackingGrowthScreen(Screen):
     def after_open(self):
         asyncio.create_task(self.run())
 
-    def set_sensor_preview_settings(self):
+    def init_sensor_preview_settings(self):
+        self._tof_sensor.stop_ranging()
         self._tof_samples = config.TOF_SAMPLES_PREVIEW
-        self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
+        self._tof_sensor.timing_budget = config.TOF_TIMING_PREVIEW
+        self._tof_sensor.inter_measurement = 0
+        self._tof_sensor.start_ranging()
+
         self._scd41_sensor.stop_periodic_measurement()
+        self._scd41_sensor.mode = sht4x.Mode.NOHEAT_HIGHPRECISION
         self._scd41_sensor.start_periodic_measurement()
 
-    def set_sensor_running_settings(self):
+    def init_sensor_running_settings(self):
+        self._tof_sensor.stop_ranging()
         self._tof_samples = config.TOF_SAMPLES_RUNNING
-        self._tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
+        self._tof_sensor.timing_budget = config.TOF_TIMING_RUNNING
+        self._tof_sensor.inter_measurement = 0
+        self._tof_sensor.start_ranging()
+
         self._scd41_sensor.stop_periodic_measurement()
+        self._scd41_sensor.mode = sht4x.Mode.NOHEAT_HIGHPRECISION
         self._scd41_sensor.start_low_periodic_measurement()
 
     async def run(self):
         logger.info("Tracking...")
         # Set sensor preview settings when we first start
         logger.debug("Setting sensor settings to PREVIEW")
-        self.set_sensor_preview_settings()
-        self._scd41_sensor.mode = sht4x.Mode.NOHEAT_HIGHPRECISION
-        # change this to match the location's pressure (hPa) at sea level
-        self._bme680_sensor.sea_level_pressure = 1013.25
+        self.init_sensor_preview_settings()
 
         # Compute environment only once at the beginning if we are not running.
         self.compute_environment()
@@ -185,7 +191,7 @@ class TrackingGrowthScreen(Screen):
             self._state = TrackingGrowthScreen.STATE_RUNNING
 
             logger.debug("Setting sensor settings to RUNNING")
-            self.set_sensor_running_settings()
+            self.init_sensor_running_settings()
 
         elif self._state == TrackingGrowthScreen.STATE_RUNNING:
             logger.debug("Changing state to STOPPED")
@@ -206,14 +212,6 @@ class TrackingGrowthScreen(Screen):
             f"SCD41 - T:{self._temperature:.1f}C RH: {self._rh:.1f}% CO2: {self._co2}ppm"
         )
 
-        logger.info("Gathering BME680 data...")
-        logger.info(
-            f"BME680 - T:{self._bme680_sensor.temperature:.1f}C RH: {self._bme680_sensor.humidity:.1f}% Gas: {self._bme680_sensor.gas} Ohm"
-        )
-        logger.info(
-            f"BME680 - Altitude:{self._bme680_sensor.altitude:.1f} Pressure: {self._bme680_sensor.pressure:.1f} Si"
-        )
-
         logger.info("Gathering SHT40 data...")
         t, rh = self._sht40.measurements
         logger.info(f"SHT40 - T:{t:.1f}C RH: {rh:.1f}%")
@@ -226,9 +224,11 @@ class TrackingGrowthScreen(Screen):
 
         # Take the samples and compute the average.
         for i in range(self._tof_samples):
-            distance += self._tof_sensor.range
+            while not self._tof_sensor.data_ready:
+                pass
+            distance += self._tof_sensor.distance
 
-        # Just in case, in the case where distance = 0
+        # In the case where distance = 0
         try:
             raw_avg_distance = distance // self._tof_samples
         except ZeroDivisionError:

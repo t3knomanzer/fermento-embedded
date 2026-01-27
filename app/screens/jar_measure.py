@@ -88,16 +88,24 @@ class MeasureScreen(Screen):
     def average_sample(self, samples):
         distance = 0
         for i in range(samples):
-            distance += self._tof_sensor.range
-        return distance // samples
+            while not self._tof_sensor.data_ready:
+                pass
+            distance += self._tof_sensor.distance
+        self._tof_sensor.clear_interrupt()
+        result = (distance // samples) * 10
+        return result
 
     async def compute_distance(self):
         logger.info("Previewing distance...")
         print_mem()
-        tof_sensor.measurement_timing_budget = config.TOF_TIMING_PREVIEW
+        self._tof_sensor.stop_ranging()
+        self._tof_sensor.timing_budget = config.TOF_TIMING_PREVIEW
+        self._tof_sensor.start_ranging()
+
         while type(Screen.current_screen) == MeasureScreen:
             self._distance = self.average_sample(config.TOF_SAMPLES_PREVIEW)
             self._distance_lbl.value(f"{self._distance} mm")
+            logger.debug(f"Averaged distance: {self._distance} mm")
             await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
 
     async def save_async(self):
@@ -107,8 +115,10 @@ class MeasureScreen(Screen):
         await self.show_popup("Saving...")
 
         # We take 1 high quality sample for saving.
-        tof_sensor.measurement_timing_budget = config.TOF_TIMING_RUNNING
+        self._tof_sensor.stop_ranging()
+        self._tof_sensor.timing_budget = config.TOF_TIMING_RUNNING
         self._distance = self.average_sample(config.TOF_SAMPLES_RUNNING)
+        self._tof_sensor.start_ranging()
 
         try:
             model = JarModel(self._jar_name, self._distance)
