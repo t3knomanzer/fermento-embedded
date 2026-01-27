@@ -1,5 +1,6 @@
 import asyncio
 import gc
+from math import ceil
 
 from app.utils.memory import print_mem
 import config
@@ -16,6 +17,7 @@ from app.widgets.widgets.message_box import MessageBox
 from app.models.jar import JarModel
 from app.utils.decorators import time_it, track_mem
 from app.services.db import DBService
+from app.utils.filtering import TofDistanceFilter
 
 # Create logger
 logger = LogServiceManager.get_logger(name=__name__)
@@ -28,6 +30,8 @@ class MeasureScreen(Screen):
         self._distance = 0
         self._db_service = DBService()
         self._tof_sensor = tof_sensor
+
+        self._tof_filter = TofDistanceFilter()
 
         self._large_writer = Writer(ssd, large_font, verbose=False)
         self._small_writer = Writer(ssd, small_font, verbose=False)
@@ -85,9 +89,9 @@ class MeasureScreen(Screen):
     def back_callback(self, button, arg):
         Screen.back()
 
-    def average_sample(self, samples):
+    def sample_average(self, num_samples):
         distance = 0
-        for i in range(samples):
+        for i in range(num_samples):
             while (
                 not self._tof_sensor.data_ready
                 and not self._tof_sensor.range_status == 0
@@ -96,23 +100,23 @@ class MeasureScreen(Screen):
                     f"Ready: {self._tof_sensor.data_ready} Status: {self._tof_sensor.range_status}"
                 )
 
-            if self._tof_sensor.range_status == 0:
-                distance += self._tof_sensor.distance
+            distance += self._tof_sensor.distance
+            self._tof_sensor.clear_interrupt()
 
-        self._tof_sensor.clear_interrupt()
-        result = distance // samples
+        result = distance // num_samples
         return result
 
     async def compute_distance(self):
         logger.info("Previewing distance...")
         print_mem()
         self._tof_sensor.stop_ranging()
-        self._tof_sensor.timing_budget = config.TOF_TIMING_RUNNING
+        self._tof_sensor.timing_budget = config.TOF_TIMING_BUDGET
         self._tof_sensor.start_ranging()
 
         while type(Screen.current_screen) == MeasureScreen:
-            self._distance = self.average_sample(config.TOF_SAMPLES_RUNNING)
-            self._distance_lbl.value(f"{self._distance} mm")
+            distance = self.sample_average(config.TOF_SAMPLES)
+            self._distance = self._tof_filter.update(distance)
+            self._distance_lbl.value(f"{int(self._distance)} mm")
             await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
 
     async def save_async(self):
@@ -123,8 +127,8 @@ class MeasureScreen(Screen):
 
         # We take 1 high quality sample for saving.
         self._tof_sensor.stop_ranging()
-        self._tof_sensor.timing_budget = config.TOF_TIMING_RUNNING
-        self._distance = self.average_sample(config.TOF_SAMPLES_RUNNING)
+        self._tof_sensor.timing_budget = config.TOF_TIMING_BUDGET
+        self._distance = self.sample_average(config.TOF_SAMPLES)
         self._tof_sensor.start_ranging()
 
         try:

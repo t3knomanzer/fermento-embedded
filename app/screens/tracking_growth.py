@@ -6,9 +6,11 @@ from app.models.feeding_progress import FeedingProgressModel
 from app.services.log import LogServiceManager
 from app.utils import memory
 from app.utils.filtering import TofDistanceFilter
+from app.services.db import DBService
 import config
 from drivers import sht4x
 from hardware_setup import tof_sensor, sdc41, sht40
+
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
 from lib.gui.core.colors import BLACK, WHITE
@@ -16,7 +18,7 @@ from lib.gui.core.ugui import Screen, ssd
 from lib.gui.widgets.buttons import Button
 from lib.gui.widgets.label import Label
 from lib.gui.core.writer import Writer
-from app.services.db import DBService
+
 
 # Create logger
 logger = LogServiceManager.get_logger(name=__name__)
@@ -50,31 +52,36 @@ class TrackingGrowthScreen(Screen):
         self._scd41_sensor = sdc41
         self._sht40 = sht40
 
+        self._tof_filter = TofDistanceFilter()
+
         self._large_writer = Writer(ssd, large_font, verbose=False)
         self._small_writer = Writer(ssd, small_font, verbose=False)
         super().__init__()
 
         # UI widgets
-        # Top left (temperature)
+        # Bottom left (temperature)
+        row = ssd.height - self._small_writer.height - 2
         width = ssd.width // 3
         self._temperature_lbl = Label(
-            self._small_writer, row=2, col=2, text=width, justify=Label.LEFT
+            self._small_writer, row=row, col=2, text=width, justify=Label.LEFT
         )
         self._temperature_lbl.value("0C")
 
-        # Top center (distance)
-        row = ssd.height - self._small_writer.height - 2
+        # Bottom center (distance)
         col = ssd.width // 3
-        self._distance_lbl = Label(
-            self._small_writer, row=2, col=col, text=width, justify=Label.CENTRE
+        # self._distance_lbl = Label(
+        #     self._small_writer, row=row, col=col, text=width, justify=Label.CENTRE
+        # )
+        # self._distance_lbl.value("0mm")
+        self._co2_lbl = Label(
+            self._small_writer, row=row, col=col, text=width, justify=Label.CENTRE
         )
-        self._distance_lbl.value("0mm")
+        self._co2_lbl.value("0ppm")
 
-        # Top right (humidity)
-        row = 2
+        # Bottom right (humidity)
         col = ssd.width // 3 * 2
         self._rh_lbl = Label(
-            self._small_writer, row=2, col=col, text=width, justify=Label.RIGHT
+            self._small_writer, row=row, col=col, text=width, justify=Label.RIGHT
         )
         self._rh_lbl.value("0%")
 
@@ -100,22 +107,22 @@ class TrackingGrowthScreen(Screen):
             callback=self.start_stop_callback,
         )
 
-        # Bottom left (starter name)
+        # Top left (starter name)
         width = ssd.width // 3
-        row = ssd.height - self._small_writer.height - 2
+        row = 2
         self._starter_lbl = Label(
             self._small_writer, row=row, col=2, text=width, justify=Label.LEFT
         )
         self._starter_lbl.value(self._starter_name)
 
-        # Bottom center  (time elapsed)
+        # Top center  (time elapsed)
         col = ssd.width // 3
         self._time_lbl = Label(
             self._small_writer, row=row, col=col, text=width, justify=Label.CENTRE
         )
         self._time_lbl.value("00:00:00")
 
-        # Bottom right (jar name)
+        # Top right (jar name)
         col = ssd.width // 3 * 2
         self._jar_lbl = Label(
             self._small_writer, row=row, col=col, text=width, justify=Label.RIGHT
@@ -125,21 +132,10 @@ class TrackingGrowthScreen(Screen):
     def after_open(self):
         asyncio.create_task(self.run())
 
-    def init_sensor_preview_settings(self):
+    def init_sensors(self):
         self._tof_sensor.stop_ranging()
-        self._tof_samples = config.TOF_SAMPLES_PREVIEW
-        self._tof_sensor.timing_budget = config.TOF_TIMING_PREVIEW
-        self._tof_sensor.inter_measurement = 0
-        self._tof_sensor.start_ranging()
-
-        self._scd41_sensor.stop_periodic_measurement()
-        self._scd41_sensor.mode = sht4x.Mode.NOHEAT_HIGHPRECISION
-        self._scd41_sensor.start_periodic_measurement()
-
-    def init_sensor_running_settings(self):
-        self._tof_sensor.stop_ranging()
-        self._tof_samples = config.TOF_SAMPLES_RUNNING
-        self._tof_sensor.timing_budget = config.TOF_TIMING_RUNNING
+        self._tof_samples = config.TOF_SAMPLES
+        self._tof_sensor.timing_budget = config.TOF_TIMING_BUDGET
         self._tof_sensor.inter_measurement = 0
         self._tof_sensor.start_ranging()
 
@@ -150,8 +146,8 @@ class TrackingGrowthScreen(Screen):
     async def run(self):
         logger.info("Tracking...")
         # Set sensor preview settings when we first start
-        logger.debug("Setting sensor settings to PREVIEW")
-        self.init_sensor_preview_settings()
+        logger.debug("Initializing sensors...")
+        self.init_sensors()
 
         # Compute environment only once at the beginning if we are not running.
         self.compute_environment()
@@ -172,7 +168,7 @@ class TrackingGrowthScreen(Screen):
                 logger.info("Submitting data...")
                 gc.collect()
                 self.submit_data()
-                await asyncio.sleep(config.RUNNING_UPDATE_DELAY)
+                await asyncio.sleep(config.LIVE_UPDATE_DELAY)
 
             elif self._state == TrackingGrowthScreen.STATE_STOPPED:
                 self.compute_distance()
@@ -190,58 +186,59 @@ class TrackingGrowthScreen(Screen):
             await asyncio.sleep(0.1)
             self._state = TrackingGrowthScreen.STATE_RUNNING
 
-            logger.debug("Setting sensor settings to RUNNING")
-            self.init_sensor_running_settings()
-
         elif self._state == TrackingGrowthScreen.STATE_RUNNING:
             logger.debug("Changing state to STOPPED")
             self._state = TrackingGrowthScreen.STATE_STOPPED
             logger.debug("Stopping sensors")
             self._scd41_sensor.stop_periodic_measurement()
+            self._tof_sensor.stop_ranging()
             Screen.back()
 
     def compute_environment(self):
-        logger.info("Gathering SCD41 data...")
+        logger.info("Gathering CO2 data...")
         while not self._scd41_sensor.data_ready:
             time.sleep(0.1)
-
-        self._temperature = self._scd41_sensor.temperature
-        self._rh = self._scd41_sensor.relative_humidity
         self._co2 = self._scd41_sensor.CO2
-        logger.info(
-            f"SCD41 - T:{self._temperature:.1f}C RH: {self._rh:.1f}% CO2: {self._co2}ppm"
-        )
 
-        logger.info("Gathering SHT40 data...")
-        t, rh = self._sht40.measurements
-        logger.info(f"SHT40 - T:{t:.1f}C RH: {rh:.1f}%")
+        logger.info("Gathering temp/rh data...")
+        self._temperature, self._rh = self._sht40.measurements
+        logger.info(
+            f"T:{self._temperature:.1f}C RH: {self._rh:.1f}% CO2: {self._co2}ppm"
+        )
 
         self._temperature_lbl.value(f"{self._temperature:.1f}C")
         self._rh_lbl.value(f"{self._rh:.1f}%")
+        self._co2_lbl.value(f"{self._co2}ppm")
+
+    def sample_average(self, num_samples):
+        distance = 0
+        for i in range(num_samples):
+            while (
+                not self._tof_sensor.data_ready
+                and not self._tof_sensor.range_status == 0
+            ):
+                logger.debug(
+                    f"Ready: {self._tof_sensor.data_ready} Status: {self._tof_sensor.range_status}"
+                )
+
+            distance += self._tof_sensor.distance
+            self._tof_sensor.clear_interrupt()
+
+        result = distance // num_samples
+        return result
 
     def compute_distance(self):
-        distance = 0
-
-        # Take the samples and compute the average.
-        for i in range(self._tof_samples):
-            while not self._tof_sensor.data_ready:
-                pass
-            distance += self._tof_sensor.distance
-
-        # In the case where distance = 0
-        try:
-            raw_avg_distance = distance // self._tof_samples
-        except ZeroDivisionError:
-            raw_avg_distance = 0
+        raw_distance = self.sample_average(self._tof_samples)
+        distance = self._tof_filter.update(raw_distance)
 
         # Once we are running, save the first sample as the starting distance.
         if self._state == TrackingGrowthScreen.STATE_RUNNING:
             if self._starting_distance is None:
-                self._starting_distance = raw_avg_distance
+                self._starting_distance = distance
 
         # Update the label.
-        self._current_distance = raw_avg_distance
-        self._distance_lbl.value(f"{self._current_distance} mm")
+        self._current_distance = distance
+        # self._distance_lbl.value(f"{int(self._current_distance)} mm")
 
     def compute_growth(self):
         initial_size = self._jar_distance - self._starting_distance

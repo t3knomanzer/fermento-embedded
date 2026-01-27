@@ -36,7 +36,7 @@ class JarNameScreen(Screen):
         lbl.value("Select a name")
 
         # Generate choices
-        num_choices = config.NAME_CHOICES
+        num_choices = config.JAR_NAME_CHOICES
         btn_width = ssd.width // num_choices - margin
         btn_names = self.generate_name_choices(num_choices)
 
