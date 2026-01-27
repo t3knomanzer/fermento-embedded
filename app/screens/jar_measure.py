@@ -88,24 +88,31 @@ class MeasureScreen(Screen):
     def average_sample(self, samples):
         distance = 0
         for i in range(samples):
-            while not self._tof_sensor.data_ready:
-                pass
-            distance += self._tof_sensor.distance
+            while (
+                not self._tof_sensor.data_ready
+                and not self._tof_sensor.range_status == 0
+            ):
+                logger.debug(
+                    f"Ready: {self._tof_sensor.data_ready} Status: {self._tof_sensor.range_status}"
+                )
+
+            if self._tof_sensor.range_status == 0:
+                distance += self._tof_sensor.distance
+
         self._tof_sensor.clear_interrupt()
-        result = (distance // samples) * 10
+        result = distance // samples
         return result
 
     async def compute_distance(self):
         logger.info("Previewing distance...")
         print_mem()
         self._tof_sensor.stop_ranging()
-        self._tof_sensor.timing_budget = config.TOF_TIMING_PREVIEW
+        self._tof_sensor.timing_budget = config.TOF_TIMING_RUNNING
         self._tof_sensor.start_ranging()
 
         while type(Screen.current_screen) == MeasureScreen:
-            self._distance = self.average_sample(config.TOF_SAMPLES_PREVIEW)
+            self._distance = self.average_sample(config.TOF_SAMPLES_RUNNING)
             self._distance_lbl.value(f"{self._distance} mm")
-            logger.debug(f"Averaged distance: {self._distance} mm")
             await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
 
     async def save_async(self):
