@@ -31,6 +31,9 @@ from drivers.scd4x import SCD4X
 logger.info("Importing SHT40 driver...")
 from drivers.sht4x import SHT4x
 
+logger.info("Importing BME680 driver...")
+from drivers.bme680 import Adafruit_BME680_I2C
+
 logger.info("Importing gui...")
 from lib.gui.core.ugui import Display, Screen
 
@@ -74,6 +77,9 @@ if tof_sensor is None:
 
 logger.info("Creating SCD41 sensor...")
 sdc41 = SCD4X(i2c_bus)
+
+logger.info("Creating BME680 sensor...")
+bme680 = Adafruit_BME680_I2C(i2c_bus)
 
 logger.info("Creating SHT40 sensor...")
 sht40 = SHT4x(i2c_bus)

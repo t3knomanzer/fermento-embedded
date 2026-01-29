@@ -9,7 +9,7 @@ from app.utils.filtering import TofDistanceFilter
 from app.services.db import DBService
 import config
 from drivers import sht4x
-from hardware_setup import tof_sensor, sdc41, sht40
+from hardware_setup import tof_sensor, sdc41, sht40, bme680
 
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
@@ -41,6 +41,7 @@ class TrackingGrowthScreen(Screen):
         self._temperature = 0
         self._rh = 0
         self._co2 = 0
+        self._gas = 0
         self._state = TrackingGrowthScreen.STATE_STOPPED
         self._timer_state = TrackingGrowthScreen.STATE_STOPPED
         self._elapsed_seconds = 0
@@ -51,6 +52,7 @@ class TrackingGrowthScreen(Screen):
         self._tof_sensor = tof_sensor
         self._scd41_sensor = sdc41
         self._sht40 = sht40
+        self._bme680 = bme680
 
         self._tof_filter = TofDistanceFilter()
 
@@ -149,9 +151,6 @@ class TrackingGrowthScreen(Screen):
         logger.debug("Initializing sensors...")
         self.init_sensors()
 
-        # Compute environment only once at the beginning if we are not running.
-        self.compute_environment()
-
         # Main loop
         while type(Screen.current_screen) == TrackingGrowthScreen:
             if self._state == TrackingGrowthScreen.STATE_RUNNING:
@@ -171,6 +170,7 @@ class TrackingGrowthScreen(Screen):
                 await asyncio.sleep(config.LIVE_UPDATE_DELAY)
 
             elif self._state == TrackingGrowthScreen.STATE_STOPPED:
+                self.compute_environment()
                 self.compute_distance()
                 await asyncio.sleep(config.PREVIEW_UPDATE_DELAY)
 
@@ -195,15 +195,17 @@ class TrackingGrowthScreen(Screen):
             Screen.back()
 
     def compute_environment(self):
-        logger.info("Gathering CO2 data...")
-        while not self._scd41_sensor.data_ready:
-            time.sleep(0.1)
-        self._co2 = self._scd41_sensor.CO2
+        if self._scd41_sensor.data_ready:
+            logger.info("Gathering CO2 data...")
+            self._co2 = self._scd41_sensor.CO2
+
+        logger.info("Gathering gas data...")
+        self._gas = self._bme680.gas
 
         logger.info("Gathering temp/rh data...")
         self._temperature, self._rh = self._sht40.measurements
         logger.info(
-            f"T:{self._temperature:.1f}C RH: {self._rh:.1f}% CO2: {self._co2}ppm"
+            f"T:{self._temperature:.1f}C RH:{self._rh:.1f}% CO2:{self._co2}ppm Gas:{self._gas}ohm"
         )
 
         self._temperature_lbl.value(f"{self._temperature:.1f}C")
@@ -267,11 +269,17 @@ class TrackingGrowthScreen(Screen):
             self._temperature,
             self._rh / 100,
             self._co2,
+            self._gas,
             self._starting_distance,
             self._current_distance,
         )
         logger.info(
-            f"Submitting data: feeding: {self._feeding_id} T: {self._temperature} RH: {self._rh}% CO2: {self._co2}ppm starting distance:{self._starting_distance} cur distance: {self._current_distance}"
+            f"Submitting data: feeding: {self._feeding_id} T: {self._temperature} RH: {self._rh}% "
         )
+        logger.info(f"CO2: {self._co2}ppm {self._gas}ohm")
+        logger.info(
+            f"starting distance:{self._starting_distance} cur distance: {self._current_distance}"
+        )
+
         memory.print_mem()
         self._db_service.create_feeding_progress(model)
