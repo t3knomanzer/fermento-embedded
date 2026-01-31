@@ -9,7 +9,7 @@ from app.utils.filtering import TofDistanceFilter
 from app.services.db import DBService
 import config
 from drivers import sht4x
-from hardware_setup import tof_sensor, sdc41, sht40, bme680
+from hardware_setup import tof_sensor, sdc41, sht40
 
 import lib.gui.fonts.freesans20 as large_font
 import lib.gui.fonts.arial10 as small_font
@@ -41,13 +41,11 @@ class TrackingGrowthScreen(Screen):
         self._temperature = 0
         self._rh = 0
         self._co2 = 0
-        self._gas = 0
         self._state = TrackingGrowthScreen.STATE_STOPPED
         self._timer_state = TrackingGrowthScreen.STATE_STOPPED
         self._elapsed_seconds = 0
         self._elapsed_minutes = 0
         self._elapsed_hours = 0
-        self._bme680_task = None
         self._timer_task = None
         self._run_task = None
 
@@ -55,7 +53,6 @@ class TrackingGrowthScreen(Screen):
         self._tof_sensor = tof_sensor
         self._scd41_sensor = sdc41
         self._sht40 = sht40
-        self._bme680 = bme680
 
         self._tof_filter = TofDistanceFilter()
 
@@ -175,24 +172,15 @@ class TrackingGrowthScreen(Screen):
 
         self._scd41_sensor.mode = sht4x.Mode.NOHEAT_HIGHPRECISION
 
-        self._bme680.humidity_oversample = 2
-        self._bme680.pressure_oversample = 4
-        self._bme680.temperature_oversample = 8
-        self._bme680.filter_size = 3
-        self._bme680.set_gas_heater(320, 150)
-
     def start_sensors(self):
         logger.info("Starting sensors...")
         self._tof_sensor.start_ranging()
         self._scd41_sensor.start_periodic_measurement()
-        self._bme680_task = asyncio.create_task(self.start_bme680_measurements())
 
     def stop_sensors(self):
         logger.info("Stopping sensors...")
         self._tof_sensor.stop_ranging()
         self._scd41_sensor.stop_periodic_measurement()
-        if self._bme680_task:
-            self._bme680_task.cancel()
 
     def start_timer(self):
         logger.info("Starting timer...")
@@ -202,14 +190,6 @@ class TrackingGrowthScreen(Screen):
         logger.info("Stopping timer...")
         if self._timer_task:
             self._timer_task.cancel()
-
-    async def start_bme680_measurements(self, update_interval_s=2):
-        start_ms = time.ticks_ms()
-        while True:
-            logger.debug("Maintaining gas...")
-            elapsed = time.ticks_diff(time.ticks_ms(), start_ms)
-            self._bme680._perform_reading()
-            await asyncio.sleep(update_interval_s)
 
     async def run(self):
         logger.info("Tracking...")
@@ -236,15 +216,10 @@ class TrackingGrowthScreen(Screen):
             logger.info("Gathering CO2 data...")
             self._co2 = self._scd41_sensor.CO2
 
-        logger.info("Gathering gas data...")
-        self._gas = self._bme680.gas
-
         logger.info("Gathering temp/rh data...")
         self._temperature, self._rh = self._sht40.measurements
 
-        logger.info(
-            f"T:{self._temperature:.1f}C RH:{self._rh:.1f}% CO2:{self._co2}ppm Gas:{self._gas}ohm"
-        )
+        logger.info(f"T:{self._temperature:.1f}C RH:{self._rh:.1f}% CO2:{self._co2}ppm")
 
         self._temperature_lbl.value(f"{self._temperature:.1f}C")
         self._rh_lbl.value(f"{self._rh:.1f}%")
@@ -308,14 +283,13 @@ class TrackingGrowthScreen(Screen):
             self._temperature,
             self._rh / 100,
             self._co2,
-            self._gas,
             self._starting_distance,
             self._current_distance,
         )
         logger.info(
             f"Submitting data: feeding: {self._feeding_id} T: {self._temperature} RH: {self._rh}% "
         )
-        logger.info(f"CO2: {self._co2}ppm {self._gas}ohm")
+        logger.info(f"CO2: {self._co2}ppm")
         logger.info(
             f"starting distance:{self._starting_distance} cur distance: {self._current_distance}"
         )
